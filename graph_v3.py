@@ -5,6 +5,7 @@ from openpyxl import load_workbook
 from datetime import datetime
 import matplotlib.cm as cm
 import numpy as np
+from matplotlib.dates import DateFormatter, HourLocator
 
 # 엑셀 파일 로드
 wb = load_workbook("/home/ubuntu/watcher/outputs/hw12.xlsx")
@@ -30,27 +31,30 @@ for sheet in wb.sheetnames:
 
 # 그래프 그리기
 for student, code_dict in data.items():
-    plt.figure(figsize=(15, 8))  # 그래프 크기 조정
+    plt.figure(figsize=(30, 8))  # 가로 크기를 15에서 20으로 증가
     
     # 코드 파일별 색상 지정 (최대 20개 색상)
     cmap = plt.colormaps["tab20"]
     colors = cmap(np.linspace(0, 1, len(code_dict)))
     
     for idx, (code, snapshots) in enumerate(code_dict.items()):
-        # 시간 순 정렬
         snapshots.sort()
         times, file_sizes = zip(*snapshots)
         
-        # 그래프 플롯 (선 스타일 조정)
-        plt.plot(times, file_sizes, marker='o', markersize=6, 
+        # 타임스탬프를 datetime 객체로 변환
+        times = [datetime.fromtimestamp(t) for t in times]
+        
+        plt.plot(times, file_sizes, marker='o', markersize=4, 
                 label=os.path.basename(code), color=colors[idx], 
                 linewidth=2, linestyle='-')
 
-    # 그래프 설정
+    # x축 설정 변경
+    plt.gca().xaxis.set_major_formatter(DateFormatter('%m/%d\n%H:%M'))  # 월/일\n시간:분 형식
+    plt.xticks(times, rotation=45, ha='right')  # 실제 타임스탬프를 눈금으로 사용
+    
     plt.xlabel("Time", fontsize=12)
     plt.ylabel("File Size (bytes)", fontsize=12)
-    plt.title(f"HW12 File Size Changes - {student}", fontsize=14, pad=20)
-    plt.xticks(rotation=45, ha='right')
+    plt.title(f"HW12 - {student}", fontsize=14, pad=20)
     
     # 범례 설정
     plt.legend(title="Code Files", loc='center left', 
