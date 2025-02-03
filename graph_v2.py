@@ -42,9 +42,9 @@ for sheet in wb.sheetnames:
 # 그래프 그리기
 for student, hw_dict in data.items():
     for hw, code_dict in hw_dict.items():
-        plt.figure(figsize=(12, 7))
+        plt.figure(figsize=(50, 30))
         # cmap = plt.cm.get_cmap("tab10", len(code_dict))  # 코드 파일별 색상 지정
-        cmap = plt.colormaps["tab10"]
+        cmap = plt.colormaps["tab20"]
         colors = cmap(np.arange(len(code_dict)))
         
         for idx, (code, snapshots) in enumerate(code_dict.items()):
@@ -56,14 +56,14 @@ for student, hw_dict in data.items():
             times = [time.strftime("%Y-%m-%d %H:%M:%S") for time in times]
             
             # 그래프 플롯 (작은 마커, 투명도 적용, 점선 스타일)
-            plt.plot(times, file_sizes, marker='o', markersize=4, alpha=1.0, label=code, color=colors[idx])
+            plt.plot(times, file_sizes, marker='o', markersize=10, label=code, color=colors[idx])
 
         # 그래프 설정
         plt.xlabel("Time")
         plt.ylabel("File Size (bytes)")
         plt.title(f"{hw} - {student}")
         plt.xticks(rotation=45)  # x축 레이블 회전
-        plt.legend(title="Code Files", loc='upper left', fontsize='small', frameon=True)
+        plt.legend(title="Code Files", loc='upper left', fontsize='large', frameon=True)
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.tight_layout()
 
