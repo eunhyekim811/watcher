@@ -1,11 +1,15 @@
 from flask import Flask, request, jsonify
 import os
-import re
 from collections import defaultdict
+from flask_cors import CORS
+from datetime import datetime
+import pytz
 
 app = Flask(__name__)
 
 BASE_DIR = "/home/ubuntu/Couch"  # OpenStack 인스턴스 내부의 기본 경로
+
+CORS(app)
 
 # 학번과 과제명에 해당하는 코드 파일명을 조회
 def list_code_files(student_id, assignment_name):
@@ -15,6 +19,7 @@ def list_code_files(student_id, assignment_name):
         return {"error": "Directory not found"}, 404
 
     code_files = [entry.name for entry in os.scandir(path) if entry.is_dir()]
+    print(code_files)
     
     return {"path": path, "code_files": code_files}
 
@@ -39,6 +44,12 @@ def list_snapshots(student_id, assignment_name, code_file_name):
     return {"code_file": code_file_name, "snapshots": snapshot_files}
 
 
+def convert_timestamp(timestamp):
+    """Unix timestamp(초)를 대한민국 시간(KST, UTC+9)으로 변환"""
+    utc_time = datetime.utcfromtimestamp(int(timestamp))  # UTC 시간 변환
+    kst_time = utc_time.replace(tzinfo=pytz.utc).astimezone(pytz.timezone('Asia/Seoul'))  # KST 변환
+    return kst_time.strftime('%Y-%m-%d %H:%M:%S')  # YYYY-MM-DD HH:MM:SS 형식으로 반환
+
 def get_snapshot_trends(student_id, assignment_name):
     """최하위 모든 스냅샷 파일을 찾아 코드파일명별로 시간당 크기 변화를 반환"""
     path = os.path.join(BASE_DIR, student_id, assignment_name)
@@ -56,11 +67,15 @@ def get_snapshot_trends(student_id, assignment_name):
             for snapshot in os.scandir(snapshot_dir):
                 if snapshot.is_file() and snapshot.name.isdigit():
                     timestamp = snapshot.name
+                    kst_timestamp = convert_timestamp(timestamp)
                     size = os.path.getsize(snapshot.path)
-                    snapshot_trends[code_file_name].append({"timestamp": timestamp, "size": size})
+                    snapshot_trends[code_file_name].append({"timestamp": kst_timestamp, "size": size})
 
             # 각 코드파일별 스냅샷 데이터를 시간순으로 정렬
             snapshot_trends[code_file_name].sort(key=lambda x: x["timestamp"])
+            
+    print(snapshot_trends)
+    return snapshot_trends
 
 
 # 과제를 선택하면 코드 파일명을 조회하는 API
@@ -101,14 +116,23 @@ def get_file_content():
         return jsonify({"error": "Missing required parameters"}), 400
 
     file_path = os.path.join(BASE_DIR, student_id, assignment_name, code_file_name, snapshot_name)
+    print(file_path)
 
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        # 이진 모드로 파일 열기
+        with open(file_path, "rb") as f:
             content = f.read()
-        return jsonify({"content": content})
+
+        # 바이너리 데이터를 안전한 형식으로 변환
+        try:
+            decoded_content = content.decode("utf-8")  # UTF-8로 해석 시도
+        except UnicodeDecodeError:
+            decoded_content = content.hex()  # UTF-8이 아닐 경우, 16진수(hex) 문자열로 변환
+
+        return {"content": decoded_content}
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -121,9 +145,9 @@ def get_snapshot_trends_api():
     if not student_id or not assignment_name:
         return jsonify({"error": "student_id and assignment_name are required"}), 400
 
-    return jsonify(get_snapshot_trends(student_id, assignment_name))
+    return jsonify({"snapshot_trends": get_snapshot_trends(student_id, assignment_name)})
 
 
 # 서버 실행
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3000, debug=True)
+    app.run(host="0.0.0.0", port=8080, debug=True)
