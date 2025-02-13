@@ -19,9 +19,33 @@ def list_code_files(student_id, assignment_name):
         return {"error": "Directory not found"}, 404
 
     code_files = [entry.name for entry in os.scandir(path) if entry.is_dir()]
-    print(code_files)
+    # print(code_files)
     
     return {"path": path, "code_files": code_files}
+
+def get_snapshot_average(student_id, assignment_name):
+    """각 코드 파일별 스냅샷 개수의 평균을 계산"""
+    path = os.path.join(BASE_DIR, student_id, assignment_name)
+    
+    if not os.path.exists(path):
+        return {"error": "Directory not found"}, 404
+    
+    snapshot_counts = []  # 각 코드 파일의 스냅샷 개수를 저장
+    
+    for entry in os.scandir(path):
+        if entry.is_dir():  # 코드 파일 디렉터리
+            code_file_name = entry.name
+            snapshot_dir = os.path.join(path, code_file_name)
+            
+            snapshot_count = sum(1 for snapshot in os.scandir(snapshot_dir) if snapshot.is_file() and snapshot.name.isdigit())
+            snapshot_counts.append(snapshot_count)
+    
+    if not snapshot_counts:
+        return {"error": "No snapshots found"}, 404
+    
+    average_snapshots = round(sum(snapshot_counts) / len(snapshot_counts), 2)
+    print(average_snapshots)
+    return {"average_snapshots": average_snapshots}
 
 
 def list_snapshots(student_id, assignment_name, code_file_name):
@@ -67,14 +91,14 @@ def get_snapshot_trends(student_id, assignment_name):
             for snapshot in os.scandir(snapshot_dir):
                 if snapshot.is_file() and snapshot.name.isdigit():
                     timestamp = snapshot.name
-                    kst_timestamp = convert_timestamp(timestamp)
+                    # kst_timestamp = convert_timestamp(timestamp)
                     size = os.path.getsize(snapshot.path)
-                    snapshot_trends[code_file_name].append({"timestamp": kst_timestamp, "size": size})
+                    snapshot_trends[code_file_name].append({"timestamp": timestamp, "size": size})
 
             # 각 코드파일별 스냅샷 데이터를 시간순으로 정렬
             snapshot_trends[code_file_name].sort(key=lambda x: x["timestamp"])
             
-    print(snapshot_trends)
+    # print(snapshot_trends)
     return snapshot_trends
 
 
@@ -116,7 +140,7 @@ def get_file_content():
         return jsonify({"error": "Missing required parameters"}), 400
 
     file_path = os.path.join(BASE_DIR, student_id, assignment_name, code_file_name, snapshot_name)
-    print(file_path)
+    # print(file_path)
 
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
@@ -147,6 +171,16 @@ def get_snapshot_trends_api():
 
     return jsonify({"snapshot_trends": get_snapshot_trends(student_id, assignment_name)})
 
+@app.route("/snapshot_avg", methods=["GET"])
+def get_snapshot_avg_api():
+    """각 코드 파일의 스냅샷 개수 평균을 반환하는 API"""
+    student_id = request.args.get("student_id")
+    assignment_name = request.args.get("assignment_name")
+    
+    if not student_id or not assignment_name:
+        return jsonify({"error": "student_id and assignment_name are required"}), 400
+    
+    return jsonify(get_snapshot_average(student_id, assignment_name))
 
 # 서버 실행
 if __name__ == "__main__":
